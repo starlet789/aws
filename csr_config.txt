@@ -39,7 +39,7 @@ interface Tunnel1
   ip address 169.254.10.2 255.255.255.252
   ip virtual-reassembly
   tunnel source gig1
-  tunnel destination tun1address
+  tunnel destination tunnel1
   tunnel mode ipsec ipv4
   tunnel protection ipsec profile ipsec-vpn
   ip tcp adjust-mss 1379
@@ -78,7 +78,7 @@ exit
 !
 crypto isakmp profile isakmp-vpn-2
   local-address gig 1
-  match identity address tun2address
+  match identity address tunnel2
   keyring keyring-vpn-2
 exit
 
