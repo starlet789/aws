@@ -8,12 +8,12 @@ exit
 
 crypto keyring keyring-vpn
 	local-address gig1
-  pre-shared-key address tun1address key awsamazon
+  pre-shared-key address tunnel1 key awsamazon
 exit
 
 crypto isakmp profile isakmp-vpn
   local-address gig 1
-  match identity address tun1address
+  match identity address tunnel1
   keyring keyring-vpn
 exit
 
@@ -70,7 +70,7 @@ ip route 172.16.0.0 255.255.0.0 gig1 172.16.0.1
 
 crypto keyring keyring-vpn-2
 	local-address gig1
-  pre-shared-key address tun2address key awsamazon
+  pre-shared-key address tunnel2 key awsamazon
 exit
 
 ! An ISAKMP profile is used to associate the keyring with the particular
@@ -104,7 +104,7 @@ interface Tunnel2
   ip address 169.254.11.2 255.255.255.252
   ip virtual-reassembly
   tunnel source gig1
-  tunnel destination tun2address
+  tunnel destination tunnel2
   tunnel mode ipsec ipv4
   tunnel protection ipsec profile ipsec-vpn-2
   ip tcp adjust-mss 1379
