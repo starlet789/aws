@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: "VPC Parameters"
+        Parameters:
+          - AvailabilityZoneA
+          - AvailabilityZoneB
+
+# AZ Parameters
+
+Parameters:
+  AvailabilityZoneA:
+    Description: "Choose AZ1 for your VPC."
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: "ap-northeast-1"
+  AvailabilityZoneB:
+    Description: "Choose AZ1 for your VPC."
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: "ap-northeast-1"
+
+# Create VPC
+
+Resources:
+  VPCOnPremise:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "172.16.0.0/16"
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: OnPremise
+        - Key: project
+          Value: OnPremise
+
+# Create Public Subnet
+
+  PublicSubnetAOnPremise:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCOnPremise
+      CidrBlock: "172.16.1.0/24"
+      AvailabilityZone: !Ref AvailabilityZoneA
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: OnPremise-Pub-A Subnet
+
+  PublicSubnetBOnPremise:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPCOnPremise
+      CidrBlock: "172.16.2.0/24"
+      AvailabilityZone:
+        Ref: AvailabilityZoneB
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: OnPremise-Pub-B Subnet
+
+# Create Public Route Table
+
+  PublicSubnetRouteTableOnPremise:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCOnPremise
+      Tags:
+        - Key: Name
+          Value: OnPremise-Public RT
+
+# Public A Subnet Accsociate VPC OnPremise-Public Route Table
+
+  PublicASubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicSubnetRouteTableOnPremise
+      SubnetId: !Ref PublicSubnetAOnPremise
+
+# Public B Subnet Accsociate VPC OnPremise-Public Route Table
+
+  PublicBSubnetRouteTableAssociationOnPremise:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicSubnetRouteTableOnPremise
+      SubnetId: !Ref PublicSubnetBOnPremise
+
+# Create Public Subnet
+
+  PrivateSubnetAOnPremise:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCOnPremise
+      CidrBlock: "172.16.3.0/24"
+      AvailabilityZone: !Ref AvailabilityZoneA
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: OnPremise-Priv-A Subnet
+
+  PrivateSubnetBOnPremise:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCOnPremise
+      CidrBlock: "172.16.4.0/24"
+      AvailabilityZone: !Ref AvailabilityZoneB
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: OnPremise-Priv-B Subnet
+
+# Create Private Route Table
+
+  PrivateSubnetRouteTableOnPremise:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCOnPremise
+      Tags:
+        - Key: Name
+          Value: OnPremise-Private RT
+
+# Private A Subnet Accsociate VPC-OnPremise-Private Route Table
+
+  PrivateASubnetRouteTableAssociationOnPremise:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateSubnetRouteTableOnPremise
+      SubnetId: !Ref PrivateSubnetAOnPremise
+
+# Private B Subnet Accsociate VPC-OnPremise-Private Route Table
+
+  PrivateBSubnetRouteTableAssociationOnPremise:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateSubnetRouteTableOnPremise
+      SubnetId: !Ref PrivateSubnetBOnPremise
+
+# VPC OnPremise ServerRole
+
+  ServerRoleOnPremise:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: OnPremise-SSMRole
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  InstanceProfileOnPremise:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref ServerRoleOnPremise
+
+# VPCOnPremise Security Group - ICMP , SSH Permit 
+
+  OnPremiseEc2SecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open-up ports for ICMP and SSH from All Network
+      GroupName: OnPremise-SG
+      VpcId: !Ref VPCOnPremise
+      SecurityGroupIngress:
+        - IpProtocol: icmp
+          CidrIp: 0.0.0.0/0
+          FromPort: "-1"
+          ToPort: "-1"
+        - IpProtocol: tcp
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: OnPremise-SG
+
+# Create IGW
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: OnPremise-IGW
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPCOnPremise
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicSubnetRouteTableOnPremise
